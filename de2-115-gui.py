@@ -38,8 +38,9 @@ Write:
 
 import tkinter as tk
 from tkinter import messagebox
-from threading import Timer
+from threading import Timer, Semaphore
 from functools import partial
+from typing import Mapping
 import serial                   # type: ignore
 import serial.tools.list_ports  # type: ignore
 import threading
@@ -51,7 +52,7 @@ import os
 
 # Desired serial port to connect to ("/dev/ttyXXXX" format)
 #DEFAULT_DEVICE = "/dev/ttyUSB0"
-DEFAULT_DEVICE = None
+DEFAULT_DEVICE = "/dev/pts/3"
 
 
 def resource_path(relative_path):
@@ -64,11 +65,69 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-def ser_exchange(ser, message, *args):
+
+# void send(data, type, length) {
+#   Serial.write(START_BYTE1);
+#   Serial.write(START_BYTE2);
+#   Serial.write(length);
+#   Serial.write(type);
+#   if (data != NULL && length != 0)
+#   {
+#     Serial.write(data, length);
+#  }
+# }
+
+#define START_BYTE1 40
+#define START_BYTE2 55
+
+
+
+semaforo = Semaphore(1)
+
+""""while (Serial.available()) {
+ if (Serial.read() == 0xaa) {
+   if (Serial.read() == 0x5f) {
+     length = Serial.read();
+     type = Serial.read();
+     if (length > 0) {
+      Serial.readBytes(data, length);
+     }
+     received(data, type, length);
+    }
+  }
+}"""""
+
+def receive_package():
+    full_data = []
+    if ser.read(3).decode("ascii", "ignore") == 170:
+        if ser.read(3).decode("ascii", "ignore") == 95:
+            length = ser.read(3).decode("ascii", "ignore")
+            if length == 0 : return
+            for i in range(length):
+                data = ser.read(3).decode("ascii", "ignore")
+                full_data.append(data)
+
+def send_package(data: list or None, data_type, length):
+    semaforo.acquire(True)
+    try:
+        ser.write(chr(40).encode())
+        ser.write(chr(55).encode())
+        ser.write(chr(length).encode())
+        ser.write(chr(data_type).encode())
+        if length > 0 and data:
+            for i in data:
+                if isinstance(i, str):
+                    ser.write(chr(ord(i)).encode())
+                elif isinstance(i, int):
+                    ser.write(chr(i).encode())
+    finally:
+        semaforo.release()
+
+def ser_exchange(ser, message, *args, **kwargs):
     """Exchange serial information with device."""
     ser.reset_input_buffer()
     if message != 999:  # flag for just read
-        ser.write(chr(message).encode())
+        send_package(None, message, len(kwargs['data']) if 'data' in kwargs else 0)
 
     if message == 999:  # look for device beacon
         reply = ser.read(5).decode("ascii","ignore")
@@ -269,7 +328,8 @@ def toggle_connect(dev_label):
                                    activeforeground="black",
                                    font=("Helvetica", 10, "normal"))
         display.configure(text="No connection", fg="black")
-        ser.write(chr(88).encode())
+        thread_beacon = threading.Thread(target=ser_exchange, args=(ser, 88), daemon=True)
+        thread_beacon.start()
         ser.close()
         # Return if disconnected from last connection
         if old_connection == dev_label.split()[0]:
@@ -300,7 +360,8 @@ def on_close(*args):
     if ser.is_open:
         if messagebox.askokcancel("Confirmation", "Exiting will close all connections and turn the FPGA off. Do you still want to quit?"):
             display.configure(text="No connection", fg="black")
-            ser.write(chr(88).encode())
+            thread_beacon = threading.Thread(target=ser_exchange, args=(ser, 88), daemon=True)
+            thread_beacon.start()
             ser.close()
             root.destroy()
         else:
@@ -381,7 +442,7 @@ def btn_press(num):
         timer_idle.cancel()
         create_timer_idle()
         timer_idle.start()
-    thread_btn_press = threading.Thread(target=ser_exchange, args=(ser, serial_message), daemon=True)
+    thread_btn_press = threading.Thread(target=ser_exchange, args=(ser, 5), kwargs={'data': [serial_message]}, daemon=True)
     thread_btn_press.start()
     connection = "KEY["+str(num)+"] pressed"
     display.configure(text=connection, fg="black")
@@ -396,7 +457,7 @@ def btn_release(num):
         timer_idle.cancel()
         create_timer_idle()
         timer_idle.start()
-    thread_btn_release = threading.Thread(target=ser_exchange, args=(ser, serial_message), daemon=True)
+    thread_btn_release = threading.Thread(target=ser_exchange, args=(ser, 5), kwargs={'data': [serial_message]}, daemon=True)
     thread_btn_release.start()
     connection = "KEY["+str(num)+"] released"
     display.configure(text=connection, fg="black")
@@ -411,7 +472,7 @@ def sw_toggle(num):
         timer_idle.cancel()
         create_timer_idle()
         timer_idle.start()
-    thread_sw = threading.Thread(target=ser_exchange, args=(ser, serial_message), daemon=True)
+    thread_sw = threading.Thread(target=ser_exchange, args=(ser, 5), kwargs={'data': [serial_message]}, daemon=True)
     thread_sw.start()
     curr_relief = sw[num]["relief"]
     if curr_relief == "raised":
