@@ -1,0 +1,9 @@
+../Core/Src/main.c:71:6:microDelay	16	static
+../Core/Src/main.c:77:9:DHT11_Start	32	static
+../Core/Src/main.c:108:9:DHT11_Read	16	static
+../Core/Src/main.c:139:5:main	24	static
+../Core/Src/main.c:232:6:SystemClock_Config	88	static
+../Core/Src/main.c:279:13:MX_ADC1_Init	24	static
+../Core/Src/main.c:331:13:MX_TIM1_Init	32	static
+../Core/Src/main.c:377:13:MX_GPIO_Init	40	static
+../Core/Src/main.c:416:6:Error_Handler	4	static,ignoring_inline_asm
