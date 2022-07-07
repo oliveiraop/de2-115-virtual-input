@@ -21,12 +21,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
+/* Size of Transmission buffer */
+#define TXBUFFERSIZE                      (COUNTOF(aTxBuffer))
+/* Size of Reception buffer */
+#define RXBUFFERSIZE                      TXBUFFERSIZE
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+__IO uint32_t     Transfer_Direction = 0;
+__IO uint32_t     Xfer_Complete = 0;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -41,17 +46,30 @@
 /* Private variables ---------------------------------------------------------*/
  ADC_HandleTypeDef hadc1;
 
+I2C_HandleTypeDef hi2c1;
+
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
 
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+/* Buffer used for transmission */
+uint8_t aTxBuffer[4];
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[4];
+/* USER CODE END PD */
+
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -67,6 +85,7 @@ uint32_t pMillis, cMillis;
 float tCelsius = 0;
 float tFahrenheit = 0;
 float RH = 0;
+uint8_t automatic = 1;
 
 void microDelay (uint16_t delay)
 {
@@ -162,10 +181,12 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   uint16_t readValue;
   HAL_ADC_Start(&hadc1);
   HAL_TIM_Base_Start(&htim1);
+  HAL_I2C_
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -174,53 +195,57 @@ int main(void)
   {
 
 	 /* DHT_11 */
-	  if(DHT11_Start())
-	      {
-	        RHI = DHT11_Read(); // Relative humidity integral
-	        RHD = DHT11_Read(); // Relative humidity decimal
-	        TCI = DHT11_Read(); // Celsius integral
-	        TCD = DHT11_Read(); // Celsius decimal
-	        SUM = DHT11_Read();
-	        if (RHI + RHD + TCI + TCD == SUM)
-	        {
-
-	          tCelsius = (float)TCI + (float)(TCD/10.0);
-	          tFahrenheit = tCelsius * 9/5 + 32;
-	          RH = (float)RHI + (float)(RHD/10.0);
-
-	        }
-	        if (TCI < 15)
-	        {
-;
-	        }
-	        else if (TCI < 25 )
-	        {
-
-	        }
-	        else
-	        {
-
-	        }
-	      }
-	      HAL_Delay(2000);
+	  if (automatic) {
 
 
-	      /* SENSOR LDR */
+		  if(DHT11_Start())
+			  {
+				RHI = DHT11_Read(); // Relative humidity integral
+				RHD = DHT11_Read(); // Relative humidity decimal
+				TCI = DHT11_Read(); // Celsius integral
+				TCD = DHT11_Read(); // Celsius decimal
+				SUM = DHT11_Read();
+				if (RHI + RHD + TCI + TCD == SUM)
+				{
 
-		  HAL_ADC_PollForConversion(&hadc1,1000);
-		  readValue = HAL_ADC_GetValue(&hadc1);
+				  tCelsius = (float)TCI + (float)(TCD/10.0);
+				  tFahrenheit = tCelsius * 9/5 + 32;
+				  RH = (float)RHI + (float)(RHD/10.0);
 
-		  if (readValue < 10)
+				}
+				if (TCI < 15)
+				{
+	;
+				}
+				else if (TCI < 25 )
+				{
 
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-		  else
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+				}
+				else
+				{
 
-		  HAL_Delay(50);
+				}
+			  }
+			  HAL_Delay(2000);
 
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+			  /* SENSOR LDR */
+
+			  HAL_ADC_PollForConversion(&hadc1,1000);
+			  readValue = HAL_ADC_GetValue(&hadc1);
+
+			  if (readValue < 10)
+
+				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+			  else
+				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+
+			  HAL_Delay(50);
+
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -320,6 +345,40 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 20;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
 
 }
 
