@@ -186,9 +186,12 @@ int main(void)
   uint16_t readValue;
   HAL_ADC_Start(&hadc1);
   HAL_TIM_Base_Start(&htim1);
-  HAL_I2C_
+  if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+  {
+    /* Transfer error in reception process */
+    Error_Handler();
+  }
   /* USER CODE END 2 */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
